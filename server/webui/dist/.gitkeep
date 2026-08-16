@@ -1,0 +1,1 @@
+# placeholder: keeps dist dir tracked so go:embed compiles on fresh checkout; vite build fills real assets here

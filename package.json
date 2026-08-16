@@ -1,0 +1,14 @@
+{
+  "name": "gokeep",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoKeep 基础后台管理框架",
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "dev": "pnpm --filter @gokeep/web dev",
+    "build": "pnpm --filter @gokeep/web build",
+    "typecheck": "pnpm --filter @gokeep/web typecheck",
+    "lint": "pnpm --filter @gokeep/web lint",
+    "test": "pnpm --filter @gokeep/web test:run"
+  }
+}

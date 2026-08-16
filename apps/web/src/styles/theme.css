@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============ 主题 Token ============ */
+:root {
+  --surface-page: #f8fafc;
+  --surface-panel: #ffffff;
+  --border-subtle: #dbe6ee;
+  --text-strong: #0f172a;
+  --text-body: #374151;
+  --text-muted: #9ca3af;
+  --card-border: #d6ebead1;
+  --shadow-floating: 0 24px 70px rgba(15, 23, 42, 0.14);
+}
+
+.dark {
+  --surface-page: #020617;
+  --surface-panel: #0f172a;
+  --border-subtle: #334155;
+  --text-strong: #f3f4f6;
+  --text-body: #e2e8f0;
+  --text-muted: #64748b;
+  --card-border: #334155c7;
+  --shadow-floating: none;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+/* 隐藏滚动条但保留滚动能力（侧栏/表格纵向与横向滚动均不显示滚动条） */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/旧 Edge */
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent; /* Chrome/Safari/Edge */
+}
+
+body {
+  @apply bg-surface-page font-sans text-slate-900 antialiased;
+}
+
+/* ============ 组件类（@layer components 语义类） ============ */
+@layer components {
+  /* 玻璃卡片：白渐变 + 24px 毛玻璃 + teal 描边 + 浮动阴影 */
+  .card-glass {
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: linear-gradient(#ffffffe6 0%, #ffffffc7 100%);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), var(--shadow-floating);
+  }
+  .dark .card-glass {
+    background: rgba(30, 41, 59, 0.8);
+  }
+
+  /* 主按钮 */
+  .btn-primary {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-brand-border bg-brand text-sm font-medium text-white;
+    box-shadow: 0 8px 16px rgba(0, 143, 131, 0.14);
+    transition: all 0.2s cubic-bezier(0, 0, 0.2, 1);
+  }
+  .btn-primary:hover {
+    @apply bg-brand-hover;
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+  .btn-primary:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  /* 次要按钮 */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-lg border bg-white text-sm font-medium text-brand-700;
+    border-color: #b9d6d2;
+    transition: all 0.2s cubic-bezier(0, 0, 0.2, 1);
+  }
+  .btn-secondary:hover {
+    @apply bg-brand-50;
+  }
+
+  /* 危险按钮：与主操作样式区分 */
+  .btn-danger {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-red-600 text-sm font-medium text-white;
+    transition: all 0.2s cubic-bezier(0, 0, 0.2, 1);
+  }
+  .btn-danger:hover {
+    @apply bg-red-700;
+  }
+  .btn-danger:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  /* 输入框 */
+  .input {
+    @apply w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none;
+    border-color: var(--border-subtle);
+    height: 37.6px;
+  }
+  .input::placeholder {
+    @apply text-slate-400;
+  }
+  .input:focus {
+    @apply border-brand-500;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+  }
+  .input:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  /* 小尺寸按钮：用于表格行内操作 */
+  .btn-sm {
+    @apply h-[30px] px-3 text-xs;
+  }
+
+  /* 徽章体系 */
+  .badge {
+    @apply inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-0.5 text-xs font-bold;
+  }
+  .badge-success {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+  .badge-brand {
+    @apply bg-brand-100 text-brand-700;
+  }
+  .badge-warning {
+    @apply bg-amber-100 text-amber-700;
+  }
+  .badge-danger {
+    @apply bg-red-100 text-red-700;
+  }
+  .badge-muted {
+    @apply bg-slate-100 text-slate-600;
+  }
+
+  /* 胶囊标签 */
+  .pill {
+    @apply inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  /* 表格默认不折行；窄视口由外层容器横向滚动，避免中文逐字换行。 */
+  .data-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .data-table th {
+    @apply whitespace-nowrap border-b px-3 py-3 text-left text-[13px] font-bold text-slate-600;
+    background: #f2f7f7;
+    border-color: #e4f1f0;
+  }
+  .data-table td {
+    @apply whitespace-nowrap border-b px-3 py-3 align-middle text-slate-700;
+    border-color: #e5edf3;
+  }
+  .dark .data-table th {
+    background: #111827;
+    color: #cbd5e1;
+    border-color: #1e293b;
+  }
+  .dark .data-table td {
+    color: #e2e8f0;
+    border-color: #1e293b;
+  }
+  /* 加载/空态行（colspan 单元格）固定高度，
+     避免搜索/重置时表格从多行塌陷到单行再弹回造成的抖动 */
+  .data-table td[colspan] {
+    height: 380px;
+    vertical-align: middle;
+    /* 快速请求时加载行几乎不渲染（渐入 0.18s），消除一闪；慢请求正常显示加载中 */
+    animation: table-state-in 0.18s ease;
+  }
+  @keyframes table-state-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* 全屏 72px 网格纹路 */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+.dark .bg-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+}
+
+/* 顶部 4px 渐变条 */
+.brand-gradient-bar {
+  background: linear-gradient(to right, #14b8a6, #06b6d4, #10b981);
+}

@@ -1,0 +1,32 @@
+# 依赖与构建产物
+node_modules/
+dist/
+!server/webui/dist/
+server/webui/dist/*
+!server/webui/dist/.gitkeep
+*.tsbuildinfo
+.vite/
+coverage/
+
+# 环境变量与密钥（绝不提交）
+.env
+.env.*
+!.env.example
+
+# Go
+server/bin/
+server/gokeep-server
+*.exe
+*.test
+
+# 编辑器与系统
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# 日志与临时文件
+*.log
+.tmp/
+server/tmp/

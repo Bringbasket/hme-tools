@@ -1,0 +1,50 @@
+# ============================================================
+# GoKeep 本地依赖环境（docs/09-部署与运维规范 §2）
+# 用法：cp .env.example .env && docker compose up -d
+# ============================================================
+name: gokeep
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gokeep-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gokeep}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gokeep_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-gokeep}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gokeep} -d ${POSTGRES_DB:-gokeep}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: gokeep-redis
+    restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes;
+      else
+        exec redis-server --appendonly yes;
+      fi'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli $$([ -n \"$$REDIS_PASSWORD\" ] && echo -a \"$$REDIS_PASSWORD\") ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
