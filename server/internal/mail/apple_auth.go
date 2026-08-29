@@ -106,23 +106,8 @@ func (client *AppleAuthClient) startWithSession(ctx context.Context, session *ap
 	}
 	password = ""
 	if needs2FA {
-		message := "已向受信任设备发送验证码"
 		_ = client.refreshAuthState(ctx, session)
-		if session.TwoFactorMethod == AppleTwoFactorPhone {
-			if err := client.requestPhoneCode(ctx, session); err != nil {
-				return AppleLoginStartResult{}, err
-			}
-			message = "已向受信任手机号发送短信验证码"
-		} else if session.Channel == AppleChannelICloudWeb {
-			if err := client.requestDeviceCode(ctx, session); err != nil {
-				message = "Apple 已要求二次验证，请查看受信任设备"
-			}
-		}
-		pending, err := client.putPending(session)
-		if err != nil {
-			return AppleLoginStartResult{}, err
-		}
-		return AppleLoginStartResult{Channel: session.Channel, Needs2FA: true, PendingID: pending.ID, ExpiresAt: unixPointer(pending.ExpiresAt), Message: message, AppleID: session.AppleID}, nil
+		return client.beginTwoFactor(ctx, session)
 	}
 	result, err := client.finishLogin(ctx, session)
 	if err == nil || session.Channel != AppleChannelICloudWeb || session.SessionToken == "" {
@@ -133,6 +118,29 @@ func (client *AppleAuthClient) startWithSession(ctx context.Context, session *ap
 		return AppleLoginStartResult{}, pendingErr
 	}
 	return AppleLoginStartResult{Channel: session.Channel, Needs2FA: true, PendingID: pending.ID, ExpiresAt: unixPointer(pending.ExpiresAt), Message: "登录已进入二次验证，请输入受信任设备上的验证码", AppleID: session.AppleID}, nil
+}
+
+// beginTwoFactor requests the selected challenge before creating a pending
+// login. A failed request must not leave the UI with a code entry form that
+// can never succeed.
+func (client *AppleAuthClient) beginTwoFactor(ctx context.Context, session *appleAuthSession) (AppleLoginStartResult, error) {
+	message := "已向受信任设备发送验证码"
+	if session.TwoFactorMethod == AppleTwoFactorPhone {
+		if err := client.requestPhoneCode(ctx, session); err != nil {
+			return AppleLoginStartResult{}, err
+		}
+		message = "已向受信任手机号发送短信验证码"
+	} else if session.Channel == AppleChannelICloudWeb {
+		if err := client.requestDeviceCode(ctx, session); err != nil {
+			return AppleLoginStartResult{}, err
+		}
+		message = "Apple 已向受信任设备发送验证码"
+	}
+	pending, err := client.putPending(session)
+	if err != nil {
+		return AppleLoginStartResult{}, err
+	}
+	return AppleLoginStartResult{Channel: session.Channel, Needs2FA: true, PendingID: pending.ID, ExpiresAt: unixPointer(pending.ExpiresAt), Message: message, AppleID: session.AppleID}, nil
 }
 
 func (client *AppleAuthClient) Verify(ctx context.Context, pendingID, code string) (AppleLoginStartResult, error) {
@@ -343,14 +351,17 @@ func leadingZeroBits(data []byte) int {
 }
 
 func (client *AppleAuthClient) requestDeviceCode(ctx context.Context, session *appleAuthSession) error {
-	_, _, err := client.do(ctx, session, http.MethodPut, session.Endpoints.Auth+"/verify/trusteddevice/securitycode", session.twoFactorHeaders(), nil, nil, false)
-	return err
+	status, _, err := client.do(ctx, session, http.MethodPut, session.Endpoints.Auth+"/verify/trusteddevice/securitycode", session.twoFactorHeaders(), nil, nil, false)
+	if err != nil {
+		return appleTwoFactorError("request_device", status)
+	}
+	return nil
 }
 
 func (client *AppleAuthClient) validateDeviceCode(ctx context.Context, session *appleAuthSession, code string) error {
-	_, _, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/trusteddevice/securitycode", session.twoFactorHeaders(), map[string]any{"securityCode": map[string]string{"code": code}}, nil, false)
+	status, _, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/trusteddevice/securitycode", session.twoFactorHeaders(), map[string]any{"securityCode": map[string]string{"code": code}}, nil, false)
 	if err != nil {
-		return appleProtocolError("APPLE_2FA_FAILED", "验证码不正确或已过期", true)
+		return appleTwoFactorError("verify_device", status)
 	}
 	return nil
 }
@@ -360,8 +371,11 @@ func (client *AppleAuthClient) requestPhoneCode(ctx context.Context, session *ap
 	if err != nil {
 		return err
 	}
-	_, _, err = client.do(ctx, session, http.MethodPut, session.Endpoints.Auth+"/verify/phone", session.twoFactorHeaders(), map[string]any{"phoneNumber": phone, "mode": "sms"}, nil, false)
-	return err
+	status, _, err := client.do(ctx, session, http.MethodPut, session.Endpoints.Auth+"/verify/phone", session.twoFactorHeaders(), map[string]any{"phoneNumber": phone, "mode": "sms"}, nil, false)
+	if err != nil {
+		return appleTwoFactorError("request_phone", status)
+	}
+	return nil
 }
 
 func (client *AppleAuthClient) validatePhoneCode(ctx context.Context, session *appleAuthSession, code string) error {
@@ -369,11 +383,35 @@ func (client *AppleAuthClient) validatePhoneCode(ctx context.Context, session *a
 	if err != nil {
 		return err
 	}
-	_, _, err = client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/phone/securitycode", session.twoFactorHeaders(), map[string]any{"phoneNumber": phone, "securityCode": map[string]string{"code": code}, "mode": "sms"}, nil, false)
+	status, _, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/phone/securitycode", session.twoFactorHeaders(), map[string]any{"phoneNumber": phone, "securityCode": map[string]string{"code": code}, "mode": "sms"}, nil, false)
 	if err != nil {
-		return appleProtocolError("APPLE_2FA_FAILED", "短信验证码不正确或已过期", true)
+		return appleTwoFactorError("verify_phone", status)
 	}
 	return nil
+}
+
+func appleTwoFactorError(operation string, status int) error {
+	phone := strings.Contains(operation, "phone")
+	medium := "受信任设备"
+	if phone {
+		medium = "短信验证码"
+	}
+	if status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusNetworkAuthenticationRequired {
+		return appleProtocolErrorWithStatus("APPLE_2FA_SESSION_EXPIRED", "Apple 二次验证会话已失效，请重新开始登录", false, http.StatusBadRequest)
+	}
+	if status == http.StatusTooManyRequests {
+		return appleProtocolErrorWithStatus("APPLE_2FA_RATE_LIMITED", "Apple 二次验证请求过于频繁，请稍后再试", true, http.StatusTooManyRequests)
+	}
+	if status == 0 || status >= http.StatusInternalServerError {
+		return appleProtocolErrorWithStatus("APPLE_2FA_SERVICE_UNAVAILABLE", "Apple 二次验证服务暂时不可用，请稍后再试", true, http.StatusBadGateway)
+	}
+	if strings.HasPrefix(operation, "request_") {
+		return appleProtocolErrorWithStatus("APPLE_2FA_REQUEST_FAILED", "Apple 未能发送"+medium+"，请重新开始登录", false, http.StatusBadGateway)
+	}
+	if phone {
+		return appleProtocolErrorWithStatus("APPLE_2FA_FAILED", "短信验证码不正确或已过期", false, http.StatusBadRequest)
+	}
+	return appleProtocolErrorWithStatus("APPLE_2FA_FAILED", "验证码不正确或已过期", false, http.StatusBadRequest)
 }
 
 func applePhonePayload(raw []byte, includeNonFTEU bool) (map[string]any, error) {

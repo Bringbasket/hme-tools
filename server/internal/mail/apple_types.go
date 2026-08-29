@@ -38,12 +38,17 @@ type AppleProtocolError struct {
 	Retryable      bool
 	MayHaveCreated bool
 	RetryAfter     time.Duration
+	HTTPStatus     int
 }
 
 func (err *AppleProtocolError) Error() string { return err.Message }
 
 func appleProtocolError(code, message string, retryable bool) error {
 	return &AppleProtocolError{Code: code, Message: message, Retryable: retryable}
+}
+
+func appleProtocolErrorWithStatus(code, message string, retryable bool, status int) error {
+	return &AppleProtocolError{Code: code, Message: message, Retryable: retryable, HTTPStatus: status}
 }
 
 type AppleSessionCookie struct {

@@ -54,3 +54,18 @@
 - 密码、令牌和密钥不得出现在响应或日志中。
 - 文件和标识符必须由服务端校验，不得直接拼接 SQL 或文件路径。
 - 生产环境仅通过 HTTPS 暴露接口，并限制 CORS 来源。
+
+## Apple 二次验证错误
+
+`POST /api/v1/mail/session/apple-login/start` 仅在 Apple 接受验证码发送请求后返回 `pendingId`。
+发送请求失败不会创建待验证会话。二次验证接口使用以下安全错误码：
+
+| 错误码 | 含义 | HTTP |
+| --- | --- | --- |
+| `APPLE_2FA_FAILED` | 验证码被 Apple 拒绝或已过期 | 400 |
+| `APPLE_2FA_SESSION_EXPIRED` | Apple 二次验证会话失效，需要重新开始登录 | 400 |
+| `APPLE_2FA_RATE_LIMITED` | Apple 请求过于频繁 | 429 |
+| `APPLE_2FA_REQUEST_FAILED` | Apple 未接受验证码发送请求 | 502 |
+| `APPLE_2FA_SERVICE_UNAVAILABLE` | Apple 二次验证服务或网络暂时不可用 | 502 |
+
+错误响应不会包含 Apple 原始响应、Cookie、密码、Token 或验证码内容。

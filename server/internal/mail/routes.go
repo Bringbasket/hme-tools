@@ -1024,9 +1024,12 @@ func (api *routeAPI) appleLoginVerify(w http.ResponseWriter, r *http.Request) {
 func (api *routeAPI) writeAppleLoginError(w http.ResponseWriter, r *http.Request, err error) {
 	var protocol *AppleProtocolError
 	if errors.As(err, &protocol) {
-		status := http.StatusBadGateway
-		if !protocol.Retryable {
-			status = http.StatusBadRequest
+		status := protocol.HTTPStatus
+		if status < http.StatusBadRequest || status > 599 {
+			status = http.StatusBadGateway
+			if !protocol.Retryable {
+				status = http.StatusBadRequest
+			}
 		}
 		httpx.WriteError(w, r, status, protocol.Code, protocol.Message)
 		return
