@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	stdsql "database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -26,6 +27,18 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 )
+
+// SQLDB returns the underlying database handle when this client was opened on
+// Ent's SQL driver. It lets the host run small, idempotent SQL migrations that
+// are outside GoKeep's generated schema without opening a second connection.
+func (c *Client) SQLDB() *stdsql.DB {
+	switch driver := c.config.driver.(type) {
+	case *sql.Driver:
+		return driver.DB()
+	default:
+		return nil
+	}
+}
 
 // Client is the client that holds all ent builders.
 type Client struct {

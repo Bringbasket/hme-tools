@@ -11,11 +11,11 @@ const contentClass = computed(() => (appStore.sidebarCollapsed ? 'lg:pl-16' : 'l
 </script>
 
 <template>
-  <div class="min-h-screen bg-surface-page font-sans text-slate-900">
+  <div class="min-h-screen bg-surface-page font-sans text-slate-900 dark:text-slate-100">
     <Sidebar />
     <div class="transition-[padding] duration-200" :class="contentClass">
       <Header />
-      <main class="min-h-screen px-[26px] pb-9 pt-[104px]">
+      <main class="min-h-screen px-4 pb-9 pt-[104px] sm:px-[26px]">
         <RouterView />
       </main>
     </div>

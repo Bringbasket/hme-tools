@@ -30,8 +30,8 @@ export default {
         },
         // 语义色（06-UI设计规范：成功/警告/错误/信息）
         surface: {
-          page: '#f8fafc',
-          panel: '#ffffff',
+          page: 'var(--surface-page)',
+          panel: 'var(--surface-panel)',
         },
       },
       fontFamily: {

@@ -1,0 +1,84 @@
+name: gokeep
+
+services:
+  app:
+    image: ${GOKEEP_IMAGE:-ghcr.io/bringbasket/gokeep:latest}
+    container_name: gokeep
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      SERVER_ADDR: :8080
+      DATABASE_URL: postgres://gokeep:${GOKEEP_POSTGRES_PASSWORD:?Set GOKEEP_POSTGRES_PASSWORD in .env}@postgres:5432/gokeep?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${GOKEEP_REDIS_PASSWORD:?Set GOKEEP_REDIS_PASSWORD in .env}
+      DATA_DIR: /data
+      MAIL_DATA_DIR: /data/mail
+      GOKEEP_REPOSITORY_URL: ${GOKEEP_REPOSITORY_URL:-https://github.com/Bringbasket/hme-tools}
+    ports:
+      - "127.0.0.1:${GOKEEP_HOST_PORT:-8080}:8080"
+    volumes:
+      - ./data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 4s
+      retries: 4
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${GOKEEP_REDIS_PASSWORD:?Set GOKEEP_REDIS_PASSWORD in .env}"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    environment:
+      REDIS_PASSWORD: ${GOKEEP_REDIS_PASSWORD:?Set GOKEEP_REDIS_PASSWORD in .env}
+    networks:
+      - internal
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gokeep
+      POSTGRES_USER: gokeep
+      POSTGRES_PASSWORD: ${GOKEEP_POSTGRES_PASSWORD:?Set GOKEEP_POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgresdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gokeep -d gokeep"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    networks:
+      - internal
+
+volumes:
+  postgresdata:
+  redisdata:
+
+networks:
+  internal:

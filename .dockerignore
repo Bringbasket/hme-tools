@@ -1,0 +1,8 @@
+.git
+.github
+node_modules
+apps/web/node_modules
+.env
+data
+server/webui/dist
+*.log

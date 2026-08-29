@@ -16,6 +16,14 @@ const permissionStore = usePermissionStore()
 
 const open = ref(false)
 const pageTitle = computed(() => (route.meta.title as string) || '')
+const headerTitle = computed(() => {
+  for (const menu of permissionStore.menus) {
+    const inGroup = menu.children?.some((item) => route.path === item.path || route.path.startsWith(`${item.path}/`))
+    if (inGroup) return menu.title
+    if (route.path === menu.path || route.path.startsWith(`${menu.path}/`)) return menu.title
+  }
+  return pageTitle.value || 'GoKeep'
+})
 
 async function handleLogout() {
   open.value = false
@@ -27,7 +35,8 @@ async function handleLogout() {
 
 <template>
   <header
-    class="fixed inset-x-0 top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200/50 bg-white/95 px-5 backdrop-blur lg:left-[240px] dark:border-slate-800 dark:bg-slate-900/95"
+    class="fixed inset-x-0 top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200/50 bg-white/95 px-5 backdrop-blur transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900/95"
+    :class="appStore.sidebarCollapsed ? 'lg:left-16' : 'lg:left-[240px]'"
   >
     <div class="flex items-center gap-3">
       <button
@@ -37,12 +46,12 @@ async function handleLogout() {
       >
         <Menu :size="18" />
       </button>
-      <h1 class="text-lg font-semibold text-slate-900 dark:text-white">{{ pageTitle }}</h1>
+      <h1 class="text-lg font-semibold text-slate-900 dark:text-white">{{ headerTitle }}</h1>
     </div>
 
     <DropdownMenuRoot v-model:open="open">
       <DropdownMenuTrigger
-        class="flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        class="flex h-10 max-w-[190px] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 text-sm font-medium text-slate-700 outline-none hover:border-slate-200 hover:bg-slate-50 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800"
       >
         <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
           {{ userStore.nickname.slice(0, 1) || 'U' }}

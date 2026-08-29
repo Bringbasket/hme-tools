@@ -24,6 +24,11 @@ import (
 	"gokeep/server/internal/redisx"
 )
 
+var (
+	buildVersion  string
+	buildRevision string
+)
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
@@ -38,6 +43,12 @@ func main() {
 
 func run(ctx context.Context) error {
 	cfg := config.Load()
+	if buildVersion != "" {
+		cfg.Version = buildVersion
+	}
+	if buildRevision != "" {
+		cfg.Revision = buildRevision
+	}
 	if cfg.AppEnv == "production" && cfg.JWTSecret == "" {
 		return errors.New("JWT_SECRET 必须配置（生产环境）")
 	}

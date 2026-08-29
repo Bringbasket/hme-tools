@@ -3,6 +3,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -20,7 +21,12 @@ type Config struct {
 	JWTSecret          string
 	CORSAllowedOrigins []string
 	// 登录会话有效期（JWT 与 Redis 会话键共用；env SESSION_TTL，如 2h/8h/24h，默认 2h）
-	SessionTTL time.Duration
+	SessionTTL    time.Duration
+	DataDir       string
+	MailDataDir   string
+	Version       string
+	Revision      string
+	RepositoryURL string
 }
 
 func Load() *Config {
@@ -28,6 +34,7 @@ func Load() *Config {
 	if os.Getenv("APP_ENV") != "production" {
 		_ = godotenv.Load()
 	}
+	dataDir := getEnv("DATA_DIR", "data")
 	return &Config{
 		AppEnv:        getEnv("APP_ENV", "development"),
 		ServerAddr:    getEnv("SERVER_ADDR", ":8080"),
@@ -37,6 +44,11 @@ func Load() *Config {
 		RedisDB:       getEnvInt("REDIS_DB", 0),
 		JWTSecret:     os.Getenv("JWT_SECRET"),
 		SessionTTL:    getEnvDuration("SESSION_TTL", 2*time.Hour),
+		DataDir:       dataDir,
+		MailDataDir:   getEnv("MAIL_DATA_DIR", filepath.Join(dataDir, "mail")),
+		Version:       getEnv("GOKEEP_VERSION", "0.1.0"),
+		Revision:      getEnv("GOKEEP_REVISION", "dev"),
+		RepositoryURL: getEnv("GOKEEP_REPOSITORY_URL", "https://github.com/Bringbasket/hme-tools"),
 		CORSAllowedOrigins: splitCSV(getEnv(
 			"CORS_ALLOWED_ORIGINS",
 			"http://localhost:5173,http://127.0.0.1:5173",

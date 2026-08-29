@@ -18,6 +18,7 @@ export const useAppStore = defineStore('app', () => {
   function toggleTheme() {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
     document.documentElement.classList.toggle('dark', theme.value === 'dark')
+    document.documentElement.dataset.theme = theme.value
   }
 
   function toggleSidebar() {

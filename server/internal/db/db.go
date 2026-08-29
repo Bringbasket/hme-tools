@@ -41,5 +41,8 @@ func Migrate(ctx context.Context, client *ent.Client, env string) error {
 	if env == "production" {
 		return errors.New("生产环境禁止自动迁移，请使用 deploy/migrations 脚本")
 	}
-	return client.Schema.Create(ctx)
+	if err := client.Schema.Create(ctx); err != nil {
+		return err
+	}
+	return migrateMailSchema(ctx, client)
 }

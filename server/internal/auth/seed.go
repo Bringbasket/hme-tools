@@ -65,6 +65,9 @@ func Seed(ctx context.Context, client *ent.Client) error {
 	}
 
 	// 4. 菜单树（幂等：按 path 补齐缺失菜单）
+	if err := removeRetiredMenus(ctx, client); err != nil {
+		return err
+	}
 	upgradeSettingsMenu(ctx, client)
 	seedMenus(ctx, client)
 
@@ -119,17 +122,34 @@ func seedMenus(ctx context.Context, client *ent.Client) {
 		{name: "字典管理", menuType: "C", path: "/system/dict", component: "system/dict/index", perms: "system:dict:list", icon: "book-open", order: 4, parent: "系统管理"},
 		{name: "系统设置", menuType: "C", path: "/system/settings", component: "system/settings/index", perms: "system:config:list", icon: "settings-2", order: 5, parent: "系统管理"},
 		{name: "操作日志", menuType: "C", path: "/system/operlog", component: "system/operlog/index", perms: "system:operlog:list", icon: "scroll-text", order: 6, parent: "系统管理"},
+		{name: "邮件管理", menuType: "M", path: "/mail", perms: "mail:access", icon: "mail", order: 3},
+		{name: "账号管理", menuType: "C", path: "/mail/accounts", component: "mail/pages/AccountsPage", perms: "mail:accounts:list", icon: "users", order: 1, parent: "邮件管理"},
+		{name: "邮箱管理", menuType: "C", path: "/mail/aliases", component: "mail/pages/AliasesPage", perms: "mail:aliases:list", icon: "at-sign", order: 2, parent: "邮件管理"},
+		{name: "收件箱", menuType: "C", path: "/mail/mailbox", component: "mail/pages/MailboxPage", perms: "mail:mailbox:list", icon: "inbox", order: 3, parent: "邮件管理"},
+		{name: "API 调试", menuType: "C", path: "/mail/api-builder", component: "mail/pages/APIBuilderPage", perms: "mail:access", icon: "terminal", order: 4, parent: "邮件管理"},
+		{name: "Session 管理", menuType: "C", path: "/mail/session", component: "mail/pages/SessionPage", perms: "mail:session:edit", icon: "key-round", order: 5, parent: "邮件管理"},
+		{name: "使用日志", menuType: "C", path: "/mail/logs", component: "mail/pages/ActivityLogsPage", perms: "mail:logs:list", icon: "scroll-text", order: 6, parent: "邮件管理"},
+		{name: "其他工具", menuType: "M", path: "/tools", icon: "wrench", order: 4},
+		{name: "保本测算", menuType: "C", path: "/tools/pricing", component: "tools/PricingDeskPage", icon: "calculator", order: 1, parent: "其他工具"},
 	}
 	ids := map[string]int64{}
+	existingMenus := map[string]*ent.SysMenu{}
 	// 先登记已存在菜单的 name→id（幂等基准）
 	existing, _ := client.SysMenu.Query().All(ctx)
 	for _, m := range existing {
 		ids[m.Name] = m.ID
+		existingMenus[m.Name] = m
 	}
 	created := 0
 	// 第一遍：创建缺失菜单（不设 parent，第二遍统一关联，避免依赖创建顺序）
 	for _, m := range list {
-		if _, ok := ids[m.name]; ok {
+		if existingMenu, ok := existingMenus[m.name]; ok {
+			// Keep frontend route identifiers in existing records in sync.
+			if m.component != "" && (existingMenu.Component == nil || *existingMenu.Component != m.component) {
+				if err := client.SysMenu.UpdateOneID(existingMenu.ID).SetComponent(m.component).Exec(ctx); err == nil {
+					existingMenu.Component = &m.component
+				}
+			}
 			continue // 已存在（按 name 幂等）
 		}
 		builder := client.SysMenu.Create().
@@ -185,6 +205,55 @@ func seedMenus(ctx context.Context, client *ent.Client) {
 	if fixed > 0 {
 		slog.Info("seed: 修正菜单父级关联", "count", fixed)
 	}
+}
+
+// removeRetiredMenus removes obsolete modules from existing databases, including
+// descendants and role bindings, so they cannot remain accessible via a stale route.
+func removeRetiredMenus(ctx context.Context, client *ent.Client) error {
+	tx, err := client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	menus, err := tx.SysMenu.Query().All(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	retiredNames := map[string]bool{"代理管理": true, "订单管理": true}
+	selected := make(map[int64]bool)
+	for _, menu := range menus {
+		if retiredNames[menu.Name] {
+			selected[menu.ID] = true
+		}
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, menu := range menus {
+			if selected[menu.ParentID] && !selected[menu.ID] {
+				selected[menu.ID] = true
+				changed = true
+			}
+		}
+	}
+	if len(selected) == 0 {
+		_ = tx.Rollback()
+		return nil
+	}
+
+	ids := make([]int64, 0, len(selected))
+	for id := range selected {
+		ids = append(ids, id)
+	}
+	if _, err := tx.SysRoleMenu.Delete().Where(sysrolemenu.MenuIDIn(ids...)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err := tx.SysMenu.Delete().Where(sysmenu.IDIn(ids...)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // upgradeSettingsMenu 存量库升级：参数设置 → 系统设置（改名/路径/组件，保留角色绑定）

@@ -31,8 +31,22 @@
 | `/api/v1/system/settings` | 系统设置和邮件测试 |
 | `/api/v1/system/operlogs` | 操作日志 |
 | `/api/v1/system/backup/*` | 数据库备份、恢复与 S3 检查 |
+| `/api/v1/system/version` | 当前版本与宿主机更新任务状态（需 `system:config:list`） |
+| `/api/v1/system/version/check` | 请求宿主机检查最新发布镜像（需 `system:config:edit`） |
+| `/api/v1/system/version/update` | 在检查到新版本后请求宿主机拉取、部署和健康检查（需 `system:config:edit`） |
 | `/api/v1/mail/*` | 邮件账号、隐藏邮箱、收件箱、Session 和活动日志管理（需 JWT 与邮件权限） |
 | `/share/v1/*` | 公开分享链接读取与会话交换；分享链接格式为 `/share/v1/latest?email=...&token=...` |
+
+## 版本更新
+
+版本更新接口只负责展示状态和将请求写入 `DATA_DIR/system`；它们不会在 Web 容器内执行 Docker
+命令。宿主机的 `gokeep-update.path` 监听请求文件，并由 `gokeep-update.service` 拉取镜像、重建应用
+容器、等待 `/healthz` 成功或自动回滚。
+
+`GET /api/v1/system/version` 返回当前构建和最近任务状态。`POST /api/v1/system/version/check` 创建
+检查请求；只有返回 `updateAvailable: true` 后，`POST /api/v1/system/version/update` 才会被接受。
+检查或更新已在进行时接口返回 `409`。版本状态中的 `state` 使用 `idle`、`checking`、
+`update_available`、`up_to_date`、`updating`、`restarting`、`success` 或 `error`。
 
 ## 安全
 
