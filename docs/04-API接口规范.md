@@ -68,4 +68,6 @@
 | `APPLE_2FA_REQUEST_FAILED` | Apple 未接受验证码发送请求 | 502 |
 | `APPLE_2FA_SERVICE_UNAVAILABLE` | Apple 二次验证服务或网络暂时不可用 | 502 |
 
+Apple 在部分账号的 HSA2 验证中可能在验证码正确时返回 HTTP 409 或 412；服务会根据响应体中的 `securityCode.valid=true` 接受该结果，不会误报为 `APPLE_2FA_FAILED`。其他冲突响应仍按失败处理。
+
 错误响应不会包含 Apple 原始响应、Cookie、密码、Token 或验证码内容。

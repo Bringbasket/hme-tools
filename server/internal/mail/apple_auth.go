@@ -359,8 +359,17 @@ func (client *AppleAuthClient) requestDeviceCode(ctx context.Context, session *a
 }
 
 func (client *AppleAuthClient) validateDeviceCode(ctx context.Context, session *appleAuthSession, code string) error {
-	status, _, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/trusteddevice/securitycode", session.twoFactorHeaders(), map[string]any{"securityCode": map[string]string{"code": code}}, nil, false)
+	// Apple currently returns 409 (and, for some accounts, 412) after
+	// accepting a valid code. The response body is authoritative in that
+	// case; a plain conflict must still be treated as a failed code.
+	status, data, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/trusteddevice/securitycode", session.twoFactorHeaders(), map[string]any{"securityCode": map[string]string{"code": code}}, nil, true)
+	if (status == http.StatusConflict || status == http.StatusPreconditionFailed) && appleSecurityCodeValid(data) {
+		return nil
+	}
 	if err != nil {
+		return appleTwoFactorError("verify_device", status)
+	}
+	if status == http.StatusConflict || status == http.StatusPreconditionFailed {
 		return appleTwoFactorError("verify_device", status)
 	}
 	return nil
@@ -383,11 +392,54 @@ func (client *AppleAuthClient) validatePhoneCode(ctx context.Context, session *a
 	if err != nil {
 		return err
 	}
-	status, _, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/phone/securitycode", session.twoFactorHeaders(), map[string]any{"phoneNumber": phone, "securityCode": map[string]string{"code": code}, "mode": "sms"}, nil, false)
+	status, data, err := client.do(ctx, session, http.MethodPost, session.Endpoints.Auth+"/verify/phone/securitycode", session.twoFactorHeaders(), map[string]any{"phoneNumber": phone, "securityCode": map[string]string{"code": code}, "mode": "sms"}, nil, true)
+	if (status == http.StatusConflict || status == http.StatusPreconditionFailed) && appleSecurityCodeValid(data) {
+		return nil
+	}
 	if err != nil {
 		return appleTwoFactorError("verify_phone", status)
 	}
+	if status == http.StatusConflict || status == http.StatusPreconditionFailed {
+		return appleTwoFactorError("verify_phone", status)
+	}
 	return nil
+}
+
+// appleSecurityCodeValid reports whether Apple explicitly accepted a code in
+// a non-2xx verification response. The field has appeared at the top level
+// and under phoneNumberVerification across Apple's HSA2 responses.
+func appleSecurityCodeValid(data []byte) bool {
+	var root any
+	if json.Unmarshal(data, &root) != nil {
+		return false
+	}
+	return findAppleSecurityCodeValid(root, 0)
+}
+
+func findAppleSecurityCodeValid(value any, depth int) bool {
+	if depth > 16 {
+		return false
+	}
+	switch current := value.(type) {
+	case map[string]any:
+		if securityCode, ok := current["securityCode"].(map[string]any); ok {
+			if valid, ok := securityCode["valid"].(bool); ok {
+				return valid
+			}
+		}
+		for _, child := range current {
+			if findAppleSecurityCodeValid(child, depth+1) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range current {
+			if findAppleSecurityCodeValid(child, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func appleTwoFactorError(operation string, status int) error {

@@ -143,6 +143,82 @@ func TestValidateDeviceCodeAcceptsSuccessfulResponse(t *testing.T) {
 	}
 }
 
+func TestValidateDeviceCodeAcceptsAppleConflictWithValidCode(t *testing.T) {
+	for _, status := range []int{http.StatusConflict, http.StatusPreconditionFailed} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/verify/trusteddevice/securitycode") {
+					t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+				}
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(`{"securityCode":{"code":"123456","valid":true}}`))
+			}))
+			defer server.Close()
+
+			client := NewAppleAuthClient()
+			client.httpClient = appleTestHTTPClient(server)
+			session := &appleAuthSession{
+				Channel:   AppleChannelICloudWeb,
+				Endpoints: appleWebAuthEndpoints(RegionInternational),
+				ClientID:  appleWebOAuthClientID,
+				FrameID:   "frame",
+				UserAgent: appleAuthUserAgent,
+			}
+			if err := client.validateDeviceCode(context.Background(), session, "123456"); err != nil {
+				t.Fatalf("valid code with Apple %d response returned error: %v", status, err)
+			}
+		})
+	}
+}
+
+func TestValidateDeviceCodeRejectsAppleConflictWithoutValidCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"securityCode":{"code":"123456","valid":false}}`))
+	}))
+	defer server.Close()
+
+	client := NewAppleAuthClient()
+	client.httpClient = appleTestHTTPClient(server)
+	session := &appleAuthSession{
+		Channel:   AppleChannelICloudWeb,
+		Endpoints: appleWebAuthEndpoints(RegionInternational),
+		ClientID:  appleWebOAuthClientID,
+		FrameID:   "frame",
+		UserAgent: appleAuthUserAgent,
+	}
+	var protocol *AppleProtocolError
+	if err := client.validateDeviceCode(context.Background(), session, "123456"); !errors.As(err, &protocol) || protocol.Code != "APPLE_2FA_FAILED" {
+		t.Fatalf("invalid conflict response returned error: %#v", err)
+	}
+}
+
+func TestValidatePhoneCodeAcceptsAppleConflictWithValidCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/verify/phone/securitycode") {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"phoneNumber":{},"securityCode":{"code":"123456","valid":true}}`))
+	}))
+	defer server.Close()
+
+	client := NewAppleAuthClient()
+	client.httpClient = appleTestHTTPClient(server)
+	session := &appleAuthSession{
+		Channel:         AppleChannelICloudWeb,
+		Endpoints:       appleWebAuthEndpoints(RegionInternational),
+		ClientID:        appleWebOAuthClientID,
+		FrameID:         "frame",
+		UserAgent:       appleAuthUserAgent,
+		TwoFactorMethod: AppleTwoFactorPhone,
+		TwoFactorPhone:  []byte(`{"id":1,"nonFTEU":true}`),
+	}
+	if err := client.validatePhoneCode(context.Background(), session, "123456"); err != nil {
+		t.Fatalf("valid phone code with Apple 409 response returned error: %v", err)
+	}
+}
+
 func TestICloudWebTwoFactorHeadersIncludeAppID(t *testing.T) {
 	session := &appleAuthSession{
 		Channel:   AppleChannelICloudWeb,
