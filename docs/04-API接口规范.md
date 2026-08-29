@@ -31,6 +31,8 @@
 | `/api/v1/system/settings` | 系统设置和邮件测试 |
 | `/api/v1/system/operlogs` | 操作日志 |
 | `/api/v1/system/backup/*` | 数据库备份、恢复与 S3 检查 |
+| `/api/v1/mail/*` | 邮件账号、隐藏邮箱、收件箱、Session 和活动日志管理（需 JWT 与邮件权限） |
+| `/share/v1/*` | 公开分享链接读取与会话交换；分享链接格式为 `/share/v1/latest?email=...&token=...` |
 
 ## 安全
 
