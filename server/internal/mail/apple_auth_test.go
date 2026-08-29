@@ -142,3 +142,17 @@ func TestValidateDeviceCodeAcceptsSuccessfulResponse(t *testing.T) {
 		t.Fatalf("successful verification returned error: %v", err)
 	}
 }
+
+func TestICloudWebTwoFactorHeadersIncludeAppID(t *testing.T) {
+	session := &appleAuthSession{
+		Channel:   AppleChannelICloudWeb,
+		Endpoints: appleWebAuthEndpoints(RegionInternational),
+		ClientID:  appleWebOAuthClientID,
+		FrameID:   "frame",
+		UserAgent: appleAuthUserAgent,
+	}
+	headers := session.twoFactorHeaders()
+	if headers["X-Apple-App-Id"] != appleWebOAuthClientID {
+		t.Fatalf("X-Apple-App-Id = %q, want %q", headers["X-Apple-App-Id"], appleWebOAuthClientID)
+	}
+}
