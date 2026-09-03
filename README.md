@@ -4,6 +4,12 @@ GoKeep 是面向 iCloud+ Hide My Email 的多账号邮箱管理系统。项目�
 
 > Apple Account 与 iCloud Web 均依赖 Apple 的网页接口，接口或风控策略变化可能影响登录和邮箱操作。请仅管理你有权使用的账号。
 
+## 界面预览
+
+| 邮箱管理 | 收件箱 | Session 管理 |
+| --- | --- | --- |
+| <img src="docs/screenshots/mail-management.png" alt="邮箱管理" width="320"> | <img src="docs/screenshots/inbox.png" alt="收件箱" width="320"> | <img src="docs/screenshots/session-management.png" alt="Session 管理" width="320"> |
+
 ## 业务能力
 
 ### 账号与网络
